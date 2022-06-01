@@ -200,7 +200,7 @@ endif()
 include(ProcessorCount)
 ProcessorCount(N)
 
-add_subdirectory(testsuite)
+# add_subdirectory(testsuite)
 
 # Adds a target check that runs the tests.
 add_custom_target(check DEPENDS verona)

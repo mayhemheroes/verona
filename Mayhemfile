@@ -1,0 +1,5 @@
+project: rnshah9/verona
+target: verona-parser
+
+cmds:
+  - cmd: /repo/build/dist/verona-parser @@
