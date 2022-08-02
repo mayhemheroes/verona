@@ -10,11 +10,5 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y git
 RUN cmake .. -GNinja -DVERONA_DOWNLOAD_LLVM=ON
 RUN ninja
 
-RUN mkdir -p /deps
-RUN ldd /repo/build/dist/verona-parser | tr -s '[:blank:]' '\n' | grep '^/' | xargs -I % sh -c 'cp % /deps;'
-
 FROM ubuntu:20.04 as package
-
-COPY --from=builder /deps /deps
-COPY --from=builder /repo/build/dist/verona-parser /repo/build/dist/verona-parser
-ENV LD_LIBRARY_PATH=/deps
+COPY --from=builder /repo/build/dist/verona-parser /

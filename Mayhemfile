@@ -2,4 +2,4 @@ project: verona
 target: verona-parser
 
 cmds:
-  - cmd: /repo/build/dist/verona-parser @@
+  - cmd: /verona-parser @@
