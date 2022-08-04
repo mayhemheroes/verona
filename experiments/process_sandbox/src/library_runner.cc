@@ -210,7 +210,7 @@ namespace
   /**
    * Singleton instance of the range that requests memory from the parent.
    */
-  snmalloc::SmallBuddyRange<SharedMemoryRange> allocator_range;
+  snmalloc::Pipe<SharedMemoryRange, snmalloc::SmallBuddyRange> allocator_range;
 
 }
 
@@ -229,13 +229,14 @@ bool SnmallocGlobals::is_initialised()
 
 namespace sandbox
 {
-  std::pair<snmalloc::capptr::Chunk<void>, SnmallocGlobals::SlabMetadata*>
-  SnmallocGlobals::alloc_chunk(
-    SnmallocGlobals::LocalState&, size_t size, uintptr_t ras)
+  std::
+    pair<snmalloc::capptr::Chunk<void>, SnmallocGlobals::Backend::SlabMetadata*>
+    SnmallocGlobals::Backend::alloc_chunk(
+      SnmallocGlobals::LocalState&, size_t size, uintptr_t ras)
   {
-    auto* ms =
-      new (metadata_range.alloc_range(sizeof(SnmallocGlobals::SlabMetadata))
-             .unsafe_ptr()) SnmallocGlobals::SlabMetadata();
+    auto* ms = new (
+      metadata_range.alloc_range(sizeof(SnmallocGlobals::Backend::SlabMetadata))
+        .unsafe_ptr()) SnmallocGlobals::Backend::SlabMetadata();
     snmalloc::capptr::Chunk<void> chunk{
       reinterpret_cast<void*>(requestHostService(
         AllocChunk,
@@ -246,28 +247,28 @@ namespace sandbox
     {
       metadata_range.dealloc_range(
         snmalloc::capptr::Chunk<void>{ms},
-        sizeof(SnmallocGlobals::SlabMetadata));
+        sizeof(SnmallocGlobals::Backend::SlabMetadata));
       return {nullptr, nullptr};
     }
     return {chunk, ms};
   }
 
-  void SnmallocGlobals::dealloc_chunk(
+  void SnmallocGlobals::Backend::dealloc_chunk(
     SnmallocGlobals::LocalState&,
-    SnmallocGlobals::SlabMetadata& meta_common,
+    SnmallocGlobals::Backend::SlabMetadata& meta_common,
     snmalloc::capptr::Alloc<void> start,
     size_t size)
   {
     snmalloc::capptr::Chunk<void> addr{start.unsafe_ptr()};
     metadata_range.dealloc_range(
       snmalloc::capptr::Chunk<void>{&meta_common},
-      sizeof(SnmallocGlobals::SlabMetadata));
+      sizeof(SnmallocGlobals::Backend::SlabMetadata));
     requestHostService(
       DeallocChunk, addr.unsafe_uintptr(), static_cast<uintptr_t>(size));
   }
 
   template<>
-  snmalloc::capptr::Chunk<void> SnmallocGlobals::alloc_meta_data<
+  snmalloc::capptr::Chunk<void> SnmallocGlobals::Backend::alloc_meta_data<
     snmalloc::CoreAllocator<sandbox::SnmallocGlobals>>(LocalState*, size_t size)
   {
     size = snmalloc::bits::next_pow2(size);
@@ -402,15 +403,15 @@ namespace
     shared_memory_start = shared->start;
     shared_memory_end = shared->end;
 
-    auto* base = static_cast<SnmallocGlobals::Pagemap::Entry*>(mmap(
+    auto* base = static_cast<SnmallocGlobals::PagemapEntry*>(mmap(
       nullptr,
-      decltype(SnmallocGlobals::Pagemap::pagemap)::required_size(),
+      decltype(SnmallocGlobals::pagemap)::required_size(),
       PROT_READ,
       MAP_SHARED | map_nocore,
       PageMapPage,
       0));
     SANDBOX_INVARIANT(base != MAP_FAILED, "Mapping pagemap failed");
-    SnmallocGlobals::Pagemap::pagemap.init(base);
+    SnmallocGlobals::pagemap.init(base);
 
     done_bootstrapping = true;
   }
@@ -1048,7 +1049,11 @@ int main()
   sandbox::platform::Sandbox::apply_sandboxing_policy_postexec();
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
-  sa.sa_flags = SA_SIGINFO;
+  // If we do a disallowed system call while handling another, deliver the
+  // signal immediately.  We may still not be able to handle it usefully, but
+  // we will definitely not handle it correctly if it is not delivered during
+  // system call return.
+  sa.sa_flags = SA_SIGINFO | SA_NODEFER;
   sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))emulate;
   sigaction(SyscallFrame::syscall_signal, &sa, nullptr);
   // Close the shared memory region file descriptor before we call untrusted
