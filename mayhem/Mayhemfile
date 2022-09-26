@@ -1,0 +1,7 @@
+project: verona
+target: verona-parser
+testsuite: null
+
+cmds:
+  - cmd: /verona-parser @@
+image: ghcr.io/rnshah9/playground:verona
