@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 ubuntu:20.04 as builder
+FROM --platform=linux/amd64 ubuntu as builder
 
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y cmake ninja-build python3 \
@@ -10,5 +10,5 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y git
 RUN cmake .. -GNinja -DVERONA_DOWNLOAD_LLVM=ON
 RUN ninja
 
-FROM ubuntu:20.04 as package
+FROM ubuntu as package
 COPY --from=builder /repo/build/dist/verona-parser /
