@@ -1,0 +1,6 @@
+project: verona
+target: verona-parser
+
+cmds:
+  - cmd: /verona-parser @@
+
